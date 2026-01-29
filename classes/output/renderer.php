@@ -2180,6 +2180,7 @@ class renderer extends plugin_renderer_base {
         return $time;
     }
 
+    /**
     * Build AM and PM total rows (two separate rows)
     */
    protected function get_daily_totals_rows(report_data $reportdata) {
