@@ -145,7 +145,7 @@ class export extends \moodleform {
         }
 
         if (count($ident) > 0) {
-            $mform->addGroup($ident, 'ident', get_string('identifyby', 'attendance'), ['<br />'], true);
+            $mform->addGroup($ident, 'ident', get_string('identifyby', 'attendance'), ['<br />'], false);
             $mform->setDefaults($checkedfields);
         }
         $mform->setType('id', PARAM_INT);
