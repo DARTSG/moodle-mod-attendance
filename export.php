@@ -1,3 +1,4 @@
+
 <?php
 // This file is part of Moodle - http://moodle.org/
 //
@@ -14,8 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 /**
- * Export attendance sessions - MODIFIED: merged sessions + sorted by group (A-Z) then lastname (A-Z)
- * + TOTAL ROW: shows "Status: count/total (percentage)" vertically per session column
+ * Export attendance sessions - FIXED: summary always at top + proper main header below
  *
  * @package mod_attendance
  * @copyright 2011 Artem Andreev <andreev.artem@gmail.com>
@@ -113,7 +113,7 @@ if ($formdata = $mform->get_data()) {
             }
         }
 
-        // Group sessions by time slot
+        // MERGE SESSIONS BY TIME SLOT
         $timeslots = [];
         foreach ($reportdata->sessions as $sess) {
             $key = $sess->sessdate . '_' . $sess->duration;
@@ -121,18 +121,13 @@ if ($formdata = $mform->get_data()) {
                 $timeslots[$key] = [
                     'sessdate' => $sess->sessdate,
                     'duration' => $sess->duration,
-                    'groups' => [],
                     'sessions' => [],
                 ];
-            }
-            if ($sess->groupid && !empty($reportdata->groups[$sess->groupid])) {
-                $timeslots[$key]['groups'][] = $reportdata->groups[$sess->groupid]->name;
-            } else {
-                $timeslots[$key]['groups'][] = get_string('commonsession', 'attendance');
             }
             $timeslots[$key]['sessions'][$sess->groupid] = $sess;
         }
 
+        // Session headers (merged)
         if (!empty($timeslots)) {
             foreach ($timeslots as $slotkey => $slot) {
                 $text = userdate($slot['sessdate'], get_string('strftimedmyhm', 'attendance'));
@@ -145,6 +140,7 @@ if ($formdata = $mform->get_data()) {
             throw new moodle_exception('sessionsnotfound', 'mod_attendance', $att->url_manage());
         }
 
+        // Status columns
         $setnumber = -1;
         foreach ($reportdata->statuses as $sts) {
             if ($sts->setnumber != $setnumber) {
@@ -156,66 +152,104 @@ if ($formdata = $mform->get_data()) {
         $data->tabhead[] = get_string('points', 'attendance');
         $data->tabhead[] = get_string('percentage', 'attendance');
 
-        $status_counts_per_slot = [];
-        foreach (array_keys($timeslots) as $slotkey) {
-            $status_counts_per_slot[$slotkey] = [];
-            foreach ($reportdata->statuses as $sts) {
-                $status_counts_per_slot[$slotkey][$sts->acronym] = 0;
+        // --- Build summary-only header: Summary |  | Class Size | sessions ---
+        $summaryheader = [];
+
+        // First column label
+        $summaryheader[] = get_string('summary', 'attendance');
+
+        // Fill unused columns with empty space
+        if (!empty($groupmode)) {
+            $summaryheader[] = ' ';
+        }
+
+
+        // Number of leading columns before sessions
+        $leadcols = count($summaryheader);
+
+        // Add Class size column header
+        $summaryheader[] = 'Class size';
+
+        // Add session headers only
+        $sessioncols = [];
+        foreach ($timeslots as $slot) {
+            $sessioncols[] = userdate($slot['sessdate'], get_string('strftimedmyhm', 'attendance'));
+            if (isset($formdata->includeremarks)) {
+                $sessioncols[] = '';
             }
         }
 
-        $i = 0;
+        $summaryheader = array_merge($summaryheader, $sessioncols);
+
+        // Pad to full width so column alignment stays intact
+        $summaryheader = array_pad($summaryheader, count($data->tabhead), '');
+
+
         $data->table = [];
+        $group_p_counts = [];
+        $all_groups = [];
 
-        $users_with_group = [];
-        foreach ($reportdata->users as $user) {
-            profile_load_custom_fields($user);
+        // ---- SORT USERS BY GROUP (A-Z), THEN LAST NAME (A-Z) ----
+        foreach ($reportdata->users as $u) {
+            $groupsraw = groups_get_all_groups($course->id, $u->id, 0, 'g.name');
             $groupnames = [];
-            $groupsraw = groups_get_all_groups($course->id, $user->id, 0, 'g.name');
-            foreach ($groupsraw as $g) {
-                $groupnames[] = $g->name;
+
+            if ($groupsraw) {
+                foreach ($groupsraw as $g) {
+                    $groupnames[] = $g->name;
+                }
+                sort($groupnames, SORT_NATURAL | SORT_FLAG_CASE);
+                $u->_sortgroup = $groupnames[0]; // primary group
+            } else {
+                $u->_sortgroup = ''; // users with no group go first, case should not apply to Sentinel
             }
-            sort($groupnames);
-            $sortgroup = !empty($groupnames) ? $groupnames[0] : 'No Group';
-            $sortlastname = $user->lastname ?? '';
-            $users_with_group[] = [
-                'user' => $user,
-                'sortgroup' => $sortgroup,
-                'sortlastname' => $sortlastname,
-                'grouptext' => implode(', ', $groupnames),
-            ];
         }
 
-        usort($users_with_group, function($a, $b) {
-            $group_cmp = strcasecmp($a['sortgroup'], $b['sortgroup']);
-            if ($group_cmp !== 0) return $group_cmp;
-            return strcasecmp($a['sortlastname'], $b['sortlastname']);
+        usort($reportdata->users, function($a, $b) {
+            // 1) Group name
+            $gcmp = strnatcasecmp($a->_sortgroup, $b->_sortgroup);
+            if ($gcmp !== 0) {
+                return $gcmp;
+            }
+
+            // 2) Last name
+            return strnatcasecmp($a->lastname, $b->lastname);
         });
 
-        foreach ($users_with_group as $item) {
-            $user = $item['user'];
-            $grouptext = $item['grouptext'];
-            $data->table[$i][] = $user->lastname;
-            $data->table[$i][] = $user->firstname;
-            if (!empty($groupmode)) {
-                $data->table[$i][] = $grouptext;
+
+        foreach ($reportdata->users as $user) {
+            profile_load_custom_fields($user);
+
+            $groupsraw = groups_get_all_groups($course->id, $user->id, 0, 'g.name');
+            $user_groups = [];
+            foreach ($groupsraw as $g) {
+                $user_groups[] = $g->name;
+                if (!in_array($g->name, $all_groups)) {
+                    $all_groups[] = $g->name;
+                }
             }
+
+            $row = [$user->lastname, $user->firstname];
+            if (!empty($groupmode)) {
+                $row[] = implode(', ', $user_groups);
+            }
+
             if (isset($formdata->ident)) {
                 foreach (array_keys($formdata->ident) as $opt) {
                     if (in_array($opt, array_column($customfields, 'shortname'))) {
-                        $data->table[$i][] = isset($user->profile[$opt]) ? format_string($user->profile[$opt], true, ['context' => $context]) : '';
+                        $row[] = isset($user->profile[$opt]) ? format_string($user->profile[$opt], true, ['context' => $context]) : '';
                         continue;
                     }
-                    $data->table[$i][] = $user->$opt ?? '';
+                    $row[] = $user->$opt ?? '';
                 }
             }
 
             foreach ($timeslots as $slotkey => $slot) {
                 $cell = '';
                 $remark = '';
-                $user_groups = groups_get_all_groups($course->id, $user->id, 0, 'g.id');
-                $user_group_ids = array_keys($user_groups);
+                $user_group_ids = array_keys(groups_get_all_groups($course->id, $user->id, 0, 'g.id'));
                 $found_session = null;
+
                 if (isset($slot['sessions'][0])) {
                     $found_session = $slot['sessions'][0];
                 } else {
@@ -226,6 +260,7 @@ if ($formdata = $mform->get_data()) {
                         }
                     }
                 }
+
                 if ($found_session) {
                     $log = $DB->get_record('attendance_log', [
                         'studentid' => $user->id,
@@ -239,13 +274,19 @@ if ($formdata = $mform->get_data()) {
                         }
                     }
                 }
-                $data->table[$i][] = $cell;
+
+                $row[] = $cell;
                 if (isset($formdata->includeremarks)) {
-                    $data->table[$i][] = $remark;
+                    $row[] = $remark;
                 }
 
-                if ($cell !== '') {
-                    $status_counts_per_slot[$slotkey][$cell]++;
+                if ($cell === 'P') {
+                    foreach ($user_groups as $gname) {
+                        if (!isset($group_p_counts[$gname])) {
+                            $group_p_counts[$gname] = [];
+                        }
+                        $group_p_counts[$gname][$slotkey] = ($group_p_counts[$gname][$slotkey] ?? 0) + 1;
+                    }
                 }
             }
 
@@ -253,56 +294,99 @@ if ($formdata = $mform->get_data()) {
             foreach ($reportdata->statuses as $sts) {
                 $set = $sts->setnumber;
                 $acronym = $sts->acronym;
-                $data->table[$i][] = isset($usersummary->userstakensessionsbyacronym[$set][$acronym])
+                $row[] = isset($usersummary->userstakensessionsbyacronym[$set][$acronym])
                     ? $usersummary->userstakensessionsbyacronym[$set][$acronym]
                     : 0;
             }
-            $data->table[$i][] = $usersummary->numtakensessions;
-            $data->table[$i][] = $usersummary->pointssessionscompleted;
-            $data->table[$i][] = format_float($usersummary->takensessionspercentage * 100);
+            $row[] = $usersummary->numtakensessions;
+            $row[] = $usersummary->pointssessionscompleted;
+            $row[] = format_float($usersummary->takensessionspercentage * 100);
 
-            $i++;
+            $data->table[] = $row;
         }
 
-        // === ADD TOTAL ROW ===
-        $total_row = array_fill(0, count($data->tabhead), '');
+        $group_class_sizes = [];
 
-        $total_row[0] = 'Total';
-
-        $session_start_col = 2;
-        if (!empty($groupmode)) $session_start_col++;
-        if (isset($formdata->ident)) $session_start_col += count(array_keys($formdata->ident));
-
-        $col = $session_start_col;
-
-        foreach ($timeslots as $slotkey => $slot) {
-            $summary_parts = [];
-            $total_marked = array_sum($status_counts_per_slot[$slotkey] ?? []);
-
-            if ($total_marked === 0) {
-                $summary_parts[] = '0/0 (0%)';
-            } else {
-                foreach ($reportdata->statuses as $sts) {
-                    $ac = $sts->acronym;
-                    $cnt = $status_counts_per_slot[$slotkey][$ac] ?? 0;
-                    if ($cnt > 0) {  // only show statuses that actually occurred
-                        $perc = round(($cnt / $total_marked) * 100);
-                        $summary_parts[] = $ac . ': ' . $cnt . '/' . $total_marked . ' (' . $perc . '%)';
-                    }
+        // Count students per group
+        foreach ($reportdata->users as $user) {
+            $groupsraw = groups_get_all_groups($course->id, $user->id, 0, 'g.name');
+            foreach ($groupsraw as $g) {
+                if (!isset($group_class_sizes[$g->name])) {
+                    $group_class_sizes[$g->name] = 0;
                 }
-            }
-
-            $cell_content = implode("\n", $summary_parts);
-            $total_row[$col] = $cell_content;
-
-            $col++;
-            if (isset($formdata->includeremarks)) {
-                $col++;
+                $group_class_sizes[$g->name]++;
             }
         }
 
-        $data->table[] = $total_row;
 
+        // === SUMMARY TABLE (separate block at the top) ===
+        sort($all_groups);
+
+        $summary_rows = [];
+
+        foreach ($all_groups as $gname) {
+            $row = array_fill(0, count($data->tabhead), '');
+            $row[0] = $gname;
+
+            // Column index where summary data starts
+            $col = $leadcols;
+
+            // Class size column
+            $row[$col] = $group_class_sizes[$gname] ?? 0;
+            $col++;
+
+            // Session attendance counts
+            foreach ($timeslots as $slotkey => $slot) {
+                $row[$col] = $group_p_counts[$gname][$slotkey] ?? 0;
+                $col += isset($formdata->includeremarks) ? 2 : 1;
+            }
+
+            $summary_rows[] = $row;
+        }
+
+
+        $total_row = array_fill(0, count($data->tabhead), '');
+        $total_row[0] = 'Total';
+        
+        $col = $leadcols;
+        
+        // Total class size
+        $total_row[$col] = array_sum($group_class_sizes);
+        $col++;
+        
+        // Session totals
+        foreach ($timeslots as $slotkey => $slot) {
+            $sum = 0;
+            foreach ($all_groups as $gname) {
+                $sum += $group_p_counts[$gname][$slotkey] ?? 0;
+            }
+            $total_row[$col] = $sum;
+            $col += isset($formdata->includeremarks) ? 2 : 1;
+        }
+        
+        $summary_rows[] = $total_row;
+        
+
+        // Blank separator row
+        $summary_rows[] = array_fill(0, count($data->tabhead), '');
+
+        // Build a repeated header row for the student table
+        $repeatheader = $data->tabhead;
+        $repeatheader['_repeatheader'] = true;
+
+
+        // Prepend summary + repeated header before student rows
+        $data->table = array_merge(
+            $summary_rows,        // SUMMARY + group rows + totals
+            [array_fill(0, count($data->tabhead), '')], // spacer
+            [$repeatheader],      // bold student header
+            $data->table          // student rows
+        );
+        
+        
+        $data->tabhead = $summaryheader;
+
+        // Export
         if ($formdata->format === 'text') {
             attendance_exporttocsv($data, $filename);
         } else {

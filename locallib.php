@@ -7,25 +7,21 @@
 // (at your option) any later version.
 //
 // Moodle is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// BUT WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 //
 // You should have received a copy of the GNU General Public License
-// along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
-
+// along with Moodle. If not, see <http://www.gnu.org/licenses/>.
 /**
  * local functions and constants for module attendance
  *
- * @package   mod_attendance
- * @copyright  2011 Artem Andreev <andreev.artem@gmail.com>
- * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package mod_attendance
+ * @copyright 2011 Artem Andreev <andreev.artem@gmail.com>
+ * @license http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-
 defined('MOODLE_INTERNAL') || die();
-
 require_once($CFG->libdir . '/gradelib.php');
-require_once(dirname(__FILE__) . '/renderhelpers.php');
 
 define('ATT_VIEW_DAYS', 1);
 define('ATT_VIEW_WEEKS', 2);
@@ -34,17 +30,13 @@ define('ATT_VIEW_ALLPAST', 4);
 define('ATT_VIEW_ALL', 5);
 define('ATT_VIEW_NOTPRESENT', 6);
 define('ATT_VIEW_SUMMARY', 7);
-
 define('ATT_SORT_DEFAULT', 0);
 define('ATT_SORT_LASTNAME', 1);
 define('ATT_SORT_FIRSTNAME', 2);
-
 define('ATTENDANCE_AUTOMARK_DISABLED', 0);
 define('ATTENDANCE_AUTOMARK_ALL', 1);
 define('ATTENDANCE_AUTOMARK_CLOSE', 2);
 define('ATTENDANCE_AUTOMARK_ACTIVITYCOMPLETION', 3);
-
-
 define('ATTENDANCE_SHAREDIP_DISABLED', 0);
 define('ATTENDANCE_SHAREDIP_MINUTES', 1);
 define('ATTENDANCE_SHAREDIP_FORCE', 2);
@@ -53,7 +45,7 @@ define('ATTENDANCE_SHAREDIP_FORCE', 2);
 define('ATTENDANCE_MAXWARNAFTER', 100);
 
 /**
- * Get statuses,
+ * Get statuses
  *
  * @param int $attid
  * @param bool $onlyvisible
@@ -63,7 +55,6 @@ define('ATTENDANCE_MAXWARNAFTER', 100);
 function attendance_get_statuses($attid, $onlyvisible = true, $statusset = -1) {
     global $DB;
 
-    // Set selector.
     $params = ['aid' => $attid];
     $setsql = '';
     if ($statusset >= 0) {
@@ -115,7 +106,6 @@ function attendance_get_setname($attid, $statusset, $includevalues = true) {
             $statusname .= ' (' . $statusesout . ')';
         }
     }
-
     return $statusname;
 }
 
@@ -127,11 +117,9 @@ function attendance_get_setname($attid, $statusset, $includevalues = true) {
  */
 function attendance_get_user_sessions_log_full($userid, $pageparams) {
     global $DB;
-    // All taken sessions (including previous groups).
 
     $usercourses = enrol_get_users_courses($userid);
     [$usql, $uparams] = $DB->get_in_or_equal(array_keys($usercourses), SQL_PARAMS_NAMED, 'cid0');
-
     $coursesql = "(1 = 1)";
     $courseparams = [];
     $now = time();
@@ -142,53 +130,44 @@ function attendance_get_user_sessions_log_full($userid, $pageparams) {
             'now2' => $now,
         ];
     }
-
     $datesql = "(1 = 1)";
     $dateparams = [];
     if ($pageparams->startdate && $pageparams->enddate) {
         $datesql = "ats.sessdate >= :sdate AND ats.sessdate < :edate";
         $dateparams = [
-            'sdate'     => $pageparams->startdate,
-            'edate'     => $pageparams->enddate,
+            'sdate' => $pageparams->startdate,
+            'edate' => $pageparams->enddate,
         ];
     }
-
     if ($pageparams->groupby === 'date') {
         $ordersql = "ats.sessdate ASC, c.fullname ASC, att.name ASC, att.id ASC";
     } else {
         $ordersql = "c.fullname ASC, att.name ASC, att.id ASC, ats.sessdate ASC";
     }
 
-    // WHERE clause is important:
-    // gm.userid not null => get unmarked attendances for user's current groups
-    // ats.groupid 0 => get all sessions that are for all students enrolled in course
-    // al.id not null => get all marked sessions whether or not user currently still in group.
     $sql = "SELECT ats.id, ats.groupid, ats.sessdate, ats.duration, ats.description, ats.statusset,
                    al.statusid, al.remarks, ats.studentscanmark, ats.allowupdatestatus, ats.autoassignstatus,
                    ats.preventsharedip, ats.preventsharediptime, ats.studentsearlyopentime,
                    ats.attendanceid, att.name AS attname, att.course AS courseid, c.fullname AS cname
-              FROM {attendance_sessions} ats
-              JOIN {attendance} att
-                ON att.id = ats.attendanceid
-              JOIN {course} c
-                ON att.course = c.id
-         LEFT JOIN {attendance_log} al
-                ON ats.id = al.sessionid AND al.studentid = :uid
-         LEFT JOIN {groups_members} gm
-                ON (ats.groupid = gm.groupid AND gm.userid = :uid1)
-             WHERE (gm.userid IS NOT NULL OR ats.groupid = 0 OR al.id IS NOT NULL)
-               AND att.course $usql
-               AND $datesql
-               AND $coursesql
-          ORDER BY $ordersql";
+            FROM {attendance_sessions} ats
+            JOIN {attendance} att ON att.id = ats.attendanceid
+            JOIN {course} c ON att.course = c.id
+            LEFT JOIN {attendance_log} al ON ats.id = al.sessionid AND al.studentid = :uid
+            LEFT JOIN {groups_members} gm ON (ats.groupid = gm.groupid AND gm.userid = :uid1)
+            WHERE (gm.userid IS NOT NULL OR ats.groupid = 0 OR al.id IS NOT NULL)
+              AND att.course $usql
+              AND $datesql
+              AND $coursesql
+            ORDER BY $ordersql";
 
     $params = [
-        'uid'       => $userid,
-        'uid1'      => $userid,
+        'uid' => $userid,
+        'uid1' => $userid,
     ];
     $params = array_merge($params, $uparams);
     $params = array_merge($params, $dateparams);
     $params = array_merge($params, $courseparams);
+
     $sessions = $DB->get_records_sql($sql, $params);
 
     foreach ($sessions as $sess) {
@@ -220,21 +199,15 @@ function attendance_get_user_sessions_log_full($userid, $pageparams) {
  */
 function attendance_get_user_courses_attendances($userid) {
     global $DB;
-
     $usercourses = enrol_get_users_courses($userid);
-
     [$usql, $uparams] = $DB->get_in_or_equal(array_keys($usercourses), SQL_PARAMS_NAMED, 'cid0');
-
     $sql = "SELECT att.id as attid, att.course as courseid, course.fullname as coursefullname,
                    course.startdate as coursestartdate, att.name as attname, att.grade as attgrade
-              FROM {attendance} att
-              JOIN {course} course
-                   ON att.course = course.id
-             WHERE att.course $usql
-          ORDER BY coursefullname ASC, attname ASC";
-
+            FROM {attendance} att
+            JOIN {course} course ON att.course = course.id
+            WHERE att.course $usql
+            ORDER BY coursefullname ASC, attname ASC";
     $params = array_merge($uparams, ['uid' => $userid]);
-
     return $DB->get_records_sql($sql, $params);
 }
 
@@ -269,16 +242,13 @@ function attendance_has_logs_for_status($statusid) {
  * @param MoodleQuickForm $mform
  */
 function attendance_form_sessiondate_selector(MoodleQuickForm $mform) {
-
     $mform->addElement('date_selector', 'sessiondate', get_string('sessiondate', 'attendance'));
-
     for ($i = 0; $i <= 23; $i++) {
         $hours[$i] = sprintf("%02d", $i);
     }
     for ($i = 0; $i < 60; $i++) {
         $minutes[$i] = sprintf("%02d", $i);
     }
-
     $sesendtime = [];
     if (!right_to_left()) {
         $sesendtime[] =& $mform->createElement('static', 'from', '', get_string('from', 'attendance'));
@@ -306,7 +276,6 @@ function attendance_form_sessiondate_selector(MoodleQuickForm $mform) {
  */
 function attendance_get_max_statusset($attendanceid) {
     global $DB;
-
     $max = $DB->get_field_sql(
         'SELECT MAX(setnumber) FROM {attendance_statuses} WHERE attendanceid = ? AND deleted = 0',
         [$attendanceid]
@@ -341,20 +310,15 @@ function attendance_get_statusset_maxpoints($statuses) {
  */
 function attendance_update_users_grade($attendance, $userids = []) {
     global $DB;
-
     if (empty($attendance->grade)) {
         return false;
     }
-
     [$course, $cm] = get_course_and_cm_from_instance($attendance->id, 'attendance');
-
     $summary = new mod_attendance_summary($attendance->id, $userids);
-
     if (empty($userids)) {
         $context = context_module::instance($cm->id);
         $userids = array_keys(get_enrolled_users($context, 'mod/attendance:canbelisted', 0, 'u.id'));
     }
-
     if ($attendance->grade < 0) {
         $dbparams = ['id' => -($attendance->grade)];
         $scale = $DB->get_record('scale', $dbparams);
@@ -363,12 +327,10 @@ function attendance_update_users_grade($attendance, $userids = []) {
     } else {
         $attendancegrade = $attendance->grade;
     }
-
     $grades = [];
     foreach ($userids as $userid) {
         $grades[$userid] = new stdClass();
         $grades[$userid]->userid = $userid;
-
         if ($summary->has_taken_sessions($userid)) {
             $usersummary = $summary->get_taken_sessions_summary_for($userid);
             $grades[$userid]->rawgrade = $usersummary->takensessionspercentage * $attendancegrade;
@@ -376,7 +338,6 @@ function attendance_update_users_grade($attendance, $userids = []) {
             $grades[$userid]->rawgrade = null;
         }
     }
-
     return grade_update('mod/attendance', $course->id, 'mod', 'attendance', $attendance->id, 0, $grades);
 }
 
@@ -389,20 +350,15 @@ function attendance_update_users_grade($attendance, $userids = []) {
  */
 function attendance_update_users_grades_by_id($attendanceid, $grade, $userids) {
     global $DB;
-
     if (empty($grade)) {
         return false;
     }
-
     [$course, $cm] = get_course_and_cm_from_instance($attendanceid, 'attendance');
-
     $summary = new mod_attendance_summary($attendanceid, $userids);
-
     if (empty($userids)) {
         $context = context_module::instance($cm->id);
         $userids = array_keys(get_enrolled_users($context, 'mod/attendance:canbelisted', 0, 'u.id'));
     }
-
     if ($grade < 0) {
         $dbparams = ['id' => -($grade)];
         $scale = $DB->get_record('scale', $dbparams);
@@ -411,12 +367,10 @@ function attendance_update_users_grades_by_id($attendanceid, $grade, $userids) {
     } else {
         $attendancegrade = $grade;
     }
-
     $grades = [];
     foreach ($userids as $userid) {
         $grades[$userid] = new stdClass();
         $grades[$userid]->userid = $userid;
-
         if ($summary->has_taken_sessions($userid)) {
             $usersummary = $summary->get_taken_sessions_summary_for($userid);
             $grades[$userid]->rawgrade = $usersummary->takensessionspercentage * $attendancegrade;
@@ -424,7 +378,6 @@ function attendance_update_users_grades_by_id($attendanceid, $grade, $userids) {
             $grades[$userid]->rawgrade = null;
         }
     }
-
     return grade_update('mod/attendance', $course->id, 'mod', 'attendance', $attendanceid, 0, $grades);
 }
 
@@ -439,22 +392,20 @@ function attendance_add_status($status) {
     if (empty($status->context)) {
         $status->context = context_system::instance();
     }
-
     if (!empty($status->acronym) && !empty($status->description)) {
         $status->deleted = 0;
         $status->visible = 1;
         $status->setunmarked = 0;
         $status->availablebeforesession = 0;
-
         $id = $DB->insert_record('attendance_statuses', $status);
         $status->id = $id;
-
         $event = \mod_attendance\event\status_added::create([
             'objectid' => $status->attendanceid,
             'context' => $status->context,
             'other' => ['acronym' => $status->acronym,
-                             'description' => $status->description,
-                             'grade' => $status->grade, ]]);
+                        'description' => $status->description,
+                        'grade' => $status->grade, ]
+        ]);
         if (!empty($status->cm)) {
             $event->add_record_snapshot('course_modules', $status->cm);
         }
@@ -485,7 +436,8 @@ function attendance_remove_status($status, $context = null, $cm = null) {
         'other' => [
             'acronym' => $status->acronym,
             'description' => $status->description,
-        ]]);
+        ]
+    ]);
     if (!empty($cm)) {
         $event->add_record_snapshot('course_modules', $cm);
     }
@@ -521,20 +473,16 @@ function attendance_update_status(
     $setunmarked = false
 ) {
     global $DB;
-
     if (empty($context)) {
         $context = context_system::instance();
     }
-
     if (isset($visible)) {
         $status->visible = $visible;
         $updated[] = $visible ? get_string('show') : get_string('hide');
     } else if (empty($acronym) || empty($description)) {
         return ['acronym' => $acronym, 'description' => $description];
     }
-
     $updated = [];
-
     if ($acronym) {
         $status->acronym = $acronym;
         $updated[] = $acronym;
@@ -553,7 +501,6 @@ function attendance_update_status(
                 $studentavailability = null;
             }
         }
-
         $status->studentavailability = $studentavailability;
         $updated[] = $studentavailability;
     }
@@ -568,12 +515,12 @@ function attendance_update_status(
         $status->setunmarked = 0;
     }
     $DB->update_record('attendance_statuses', $status);
-
     $event = \mod_attendance\event\status_updated::create([
         'objectid' => $status->attendanceid,
         'context' => $context,
         'other' => ['acronym' => $acronym, 'description' => $description, 'grade' => $grade,
-            'updated' => implode(' ', $updated), ]]);
+                    'updated' => implode(' ', $updated), ]
+    ]);
     if (!empty($cm)) {
         $event->add_record_snapshot('course_modules', $cm);
     }
@@ -639,7 +586,6 @@ function attendance_is_status_availablebeforesession($sessionid, $statusid = nul
     $attendanceid = $DB->get_field('attendance_sessions', 'attendanceid', ['id' => $sessionid]);
     $params = ['deleted' => 0, 'visible' => 1, 'availablebeforesession' => 1,
                'attendanceid' => $attendanceid, ];
-
     if (!empty($statusid)) {
         $params['id'] = $statusid;
     }
@@ -658,7 +604,6 @@ function attendance_can_student_mark($sess, $log = true) {
     $canmark = false;
     $reason = 'closed';
     $attconfig = get_config('attendance');
-
     if (!empty($attconfig->studentscanmark) && !empty($sess->studentscanmark)) {
         if (
             empty($attconfig->studentscanmarksessiontime) ||
@@ -672,7 +617,6 @@ function attendance_can_student_mark($sess, $log = true) {
                 $duration = $attconfig->studentscanmarksessiontimeend * 60;
             }
             if (!isset($sess->studentsearlyopentime)) {
-                // Sanity check just in case not set in this session.
                 $sess->studentsearlyopentime = 0;
             }
             if (($sess->sessdate - $sess->studentsearlyopentime) < time() && time() < ($sess->sessdate + $duration)) {
@@ -681,6 +625,7 @@ function attendance_can_student_mark($sess, $log = true) {
             }
         }
     }
+
     // Check if another student has marked attendance from this IP address recently.
     if ($canmark && !empty($sess->preventsharedip)) {
         if ($sess->preventsharedip == ATTENDANCE_SHAREDIP_MINUTES) {
@@ -694,7 +639,6 @@ function attendance_can_student_mark($sess, $log = true) {
             $params = [$sess->id, $USER->id, getremoteaddr()];
             $record = $DB->get_record_select('attendance_log', $sql, $params);
         }
-
         if (!empty($record)) {
             $canmark = false;
             $reason = 'preventsharederror';
@@ -710,7 +654,6 @@ function attendance_can_student_mark($sess, $log = true) {
                         'otheruser' => $record->studentid,
                     ],
                 ]);
-
                 $event->trigger();
             }
         }
@@ -719,16 +662,44 @@ function attendance_can_student_mark($sess, $log = true) {
 }
 
 /**
+ * Generate csv for Attendance export - ADDED: summary + blank + header + students
+ */
+function attendance_exporttocsv($data, $filename) {
+    global $CFG;
+    require_once($CFG->libdir . '/csvlib.class.php');
+
+    $csv = new csv_export_writer();
+    $csv->set_filename($filename, 'csv');
+
+    // 1. Summary rows (no header applied to summary)
+    if (!empty($data->summaryrows)) {
+        foreach ($data->summaryrows as $row) {
+            $csv->add_data($row);
+        }
+        // Blank separator row
+        $csv->add_data(array_fill(0, count($data->tabhead), ''));
+    }
+
+    // 2. Main header row (this is what was missing!)
+    $csv->add_data($data->tabhead);
+
+    // 3. Student data rows
+    foreach ($data->table as $row) {
+        $csv->add_data($row);
+    }
+
+    $csv->download_file();
+}
+
+/**
  * Generate worksheet for Attendance export
- *
- * @param stdclass $data The data for the report
- * @param string $filename The name of the file
- * @param string $format excel|ods
- *
+ * Summary rows + blank + header + students
+ * Repeated header is bolded
  */
 function attendance_exporttotableed($data, $filename, $format) {
     global $CFG;
 
+    // Workbook setup
     if ($format === 'excel') {
         require_once("$CFG->libdir/excellib.class.php");
         $filename .= ".xls";
@@ -738,65 +709,60 @@ function attendance_exporttotableed($data, $filename, $format) {
         $filename .= ".ods";
         $workbook = new MoodleODSWorkbook("-");
     }
-    // Sending HTTP headers.
+
     $workbook->send($filename);
-    // Creating the first worksheet.
-    $myxls = $workbook->add_worksheet(get_string('modulenameplural', 'attendance'));
-    // Format types.
-    $formatbc = $workbook->add_format();
-    $formatbc->set_bold(1);
+    $worksheet = $workbook->add_worksheet(get_string('modulenameplural', 'attendance'));
 
-    $myxls->write(0, 0, get_string('course'), $formatbc);
-    $myxls->write(0, 1, $data->course);
-    $myxls->write(1, 0, get_string('group'), $formatbc);
-    $myxls->write(1, 1, $data->group);
+    // Bold format (headers only)
+    $boldformat = $workbook->add_format();
+    $boldformat->set_bold(1);
 
-    $i = 3;
-    $j = 0;
+    $rowindex = 0;
+    $freezeatrow = null;
+
+
+    // Summary rows
+    if (!empty($data->summaryrows)) {
+        foreach ($data->summaryrows as $row) {
+            $colindex = 0;
+            foreach ($row as $cell) {
+                $worksheet->write($rowindex, $colindex++, $cell);
+            }
+            $rowindex++;
+        }
+        // Blank separator row
+        $rowindex++;
+    }
+
+    // Main header rows
+    $colindex = 0;
     foreach ($data->tabhead as $cell) {
-        // Merge cells if the heading would be empty (remarks column).
-        if (empty($cell)) {
-            $myxls->merge_cells($i, $j - 1, $i, $j);
-        } else {
-            $myxls->write($i, $j, $cell, $formatbc);
-        }
-        $j++;
+        $worksheet->write($rowindex, $colindex++, $cell, $boldformat);
     }
-    $i++;
-    $j = 0;
+    $rowindex++;
+
+    
+    // Student rows + repeated header (conditional bold)
     foreach ($data->table as $row) {
+        $colindex = 0;
+
+        $isrepeatheader = isset($row['_repeatheader']);
+        if ($isrepeatheader) {
+            unset($row['_repeatheader']); // remove marker before writing
+        }
+
         foreach ($row as $cell) {
-            $myxls->write($i, $j++, $cell);
+            $worksheet->write(
+                $rowindex,
+                $colindex++,
+                $cell,
+                $isrepeatheader ? $boldformat : null
+            );
         }
-        $i++;
-        $j = 0;
+        $rowindex++;
     }
+
     $workbook->close();
-}
-
-/**
- * Generate csv for Attendance export
- *
- * @param stdclass $data The data for the report
- * @param string $filename The name of the file
- *
- */
-function attendance_exporttocsv($data, $filename) {
-    $filename .= ".txt";
-
-    header("Content-Type: application/download\n");
-    header("Content-Disposition: attachment; filename=\"$filename\"");
-    header("Expires: 0");
-    header("Cache-Control: must-revalidate,post-check=0,pre-check=0");
-    header("Pragma: public");
-
-    echo get_string('course') . "\t" . $data->course . "\n";
-    echo get_string('group') . "\t" . $data->group . "\n\n";
-
-    echo implode("\t", $data->tabhead) . "\n";
-    foreach ($data->table as $row) {
-        echo implode("\t", $row) . "\n";
-    }
 }
 
 /**
@@ -807,7 +773,6 @@ function attendance_exporttocsv($data, $filename) {
  */
 function attendance_construct_sessions_data_for_add($formdata, mod_attendance_structure $att) {
     global $CFG;
-
     $sesstarttime = $formdata->sestime['starthour'] * HOURSECS + $formdata->sestime['startminute'] * MINSECS;
     $sesendtime = $formdata->sestime['endhour'] * HOURSECS + $formdata->sestime['endminute'] * MINSECS;
     $sessiondate = $formdata->sessiondate + $sesstarttime;
@@ -817,31 +782,24 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
     } else {
         $absenteereport = empty($formdata->absenteereport) ? 0 : 1;
     }
-
     $now = time();
-
     if (empty(get_config('attendance', 'studentscanmark'))) {
         $formdata->studentscanmark = 0;
     }
-
     if (empty(get_config('attendance', 'allowupdatestatus'))) {
         $formdata->allowupdatestatus = 0;
     }
-
     $calendarevent = 0;
     if (isset($formdata->calendarevent)) { // Calendar event should be created.
         $calendarevent = 1;
     }
-
     $sessions = [];
     if (isset($formdata->addmultiply)) {
         $startdate = $sessiondate;
         $enddate = $formdata->sessionenddate + DAYSECS; // Because enddate in 0:0am.
-
         if ($enddate < $startdate) {
             return null;
         }
-
         // Getting first day of week.
         $sdate = $startdate;
         $dinfo = usergetdate($sdate);
@@ -851,9 +809,7 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
             $wday = $dinfo['wday'] === 0 ? 7 : $dinfo['wday'];
             $startweek = $startdate - ($wday - 1) * DAYSECS;
         }
-
         $wdaydesc = [0 => 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
         while ($sdate < $enddate) {
             if ($sdate < strtotime('+1 week', $startweek)) {
                 $dinfo = usergetdate($sdate);
@@ -880,7 +836,6 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
                     $sess->automark = !empty($formdata->automark) ? $formdata->automark : 0;
                     $sess->automarkcmid = !empty($formdata->automarkcmid) ? $formdata->automarkcmid : 0;
                     $sess->automarkcompleted = 0;
-
                     if (!empty($formdata->usedefaultsubnet)) {
                         $sess->subnet = $att->subnet;
                     } else {
@@ -892,7 +847,6 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
                     if (!empty($formdata->preventsharediptime)) {
                         $sess->preventsharediptime = $formdata->preventsharediptime;
                     }
-
                     if (isset($formdata->studentscanmark)) { // Students will be able to mark their own attendance.
                         $sess->studentscanmark = 1;
                         if (isset($formdata->allowupdatestatus)) {
@@ -906,7 +860,6 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
                         if (isset($formdata->studentsearlyopentime)) {
                             $sess->studentsearlyopentime = $formdata->studentsearlyopentime;
                         }
-
                         if (!empty($formdata->randompassword)) {
                             $sess->studentpassword = attendance_random_string();
                         } else if (!empty($formdata->studentpassword)) {
@@ -934,10 +887,8 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
                         $sess->preventsharediptime = '';
                     }
                     $sess->statusset = $formdata->statusset;
-
                     attendance_fill_groupid($formdata, $sessions, $sess);
                 }
-
                 $sdate = strtotime("+1 day", $sdate); // Set start to tomorrow.
             } else {
                 $startweek = strtotime("+" . $formdata->period . ' weeks', $startweek);
@@ -960,26 +911,19 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
         $sess->studentpassword = '';
         $sess->automark = 0;
         $sess->automarkcompleted = 0;
-
         if (!empty($formdata->automarkcmid)) {
             $sess->automarkcmid = $formdata->automarkcmid;
         } else {
             $sess->automarkcmid = 0;
         }
-
         $sess->absenteereport = $absenteereport;
         $sess->includeqrcode = 0;
         $sess->rotateqrcode = 0;
         $sess->rotateqrcodesecret = '';
-
         if (!empty($formdata->usedefaultsubnet)) {
             $sess->subnet = $att->subnet;
         } else {
             $sess->subnet = $formdata->subnet;
-        }
-
-        if (!empty($formdata->automark)) {
-            $sess->automark = $formdata->automark;
         }
         if (!empty($formdata->automark)) {
             $sess->automark = $formdata->automark;
@@ -990,9 +934,7 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
         if (!empty($formdata->preventsharediptime)) {
             $sess->preventsharediptime = $formdata->preventsharediptime;
         }
-
         if (isset($formdata->studentscanmark) && !empty($formdata->studentscanmark)) {
-            // Students will be able to mark their own attendance.
             $sess->studentscanmark = 1;
             if (!empty($formdata->allowupdatestatus)) {
                 $sess->allowupdatestatus = $formdata->allowupdatestatus;
@@ -1020,7 +962,6 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
             } else {
                 $sess->subnet = $formdata->subnet;
             }
-
             if (!empty($formdata->automark)) {
                 $sess->automark = $formdata->automark;
             }
@@ -1032,10 +973,8 @@ function attendance_construct_sessions_data_for_add($formdata, mod_attendance_st
             }
         }
         $sess->statusset = $formdata->statusset;
-
         attendance_fill_groupid($formdata, $sessions, $sess);
     }
-
     return $sessions;
 }
 
@@ -1069,43 +1008,38 @@ function attendance_fill_groupid($formdata, &$sessions, $sess) {
  */
 function attendance_course_users_points($courseids = [], $orderby = '') {
     global $DB;
-
     $where = '';
     $params = [];
     $where .= ' AND ats.sessdate < :enddate ';
     $params['enddate'] = time();
-
     $joingroup = 'LEFT JOIN {groups_members} gm ON (gm.userid = atl.studentid AND gm.groupid = ats.groupid)';
     $where .= ' AND (ats.groupid = 0 or gm.id is NOT NULL)';
-
     if (!empty($courseids)) {
         [$insql, $inparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED);
         $where .= ' AND c.id ' . $insql;
         $params = array_merge($params, $inparams);
     }
-
     $sql = "SELECT courseid, coursename, sum(points) / sum(maxpoints) as percentage FROM (
 SELECT a.id, a.course as courseid, c.fullname as coursename, atl.studentid AS userid, COUNT(DISTINCT ats.id) AS numtakensessions,
-                        SUM(stg.grade) AS points, SUM(stm.maxgrade) AS maxpoints
-                   FROM {attendance_sessions} ats
-                   JOIN {attendance} a ON a.id = ats.attendanceid
-                   JOIN {course} c ON c.id = a.course
-                   JOIN {attendance_log} atl ON (atl.sessionid = ats.id)
-                   JOIN {attendance_statuses} stg ON (stg.id = atl.statusid AND stg.deleted = 0 AND stg.visible = 1)
-                   JOIN (SELECT attendanceid, setnumber, MAX(grade) AS maxgrade
-                           FROM {attendance_statuses}
-                          WHERE deleted = 0
-                            AND visible = 1
-                         GROUP BY attendanceid, setnumber) stm
-                     ON (stm.setnumber = ats.statusset AND stm.attendanceid = ats.attendanceid)
+SUM(stg.grade) AS points, SUM(stm.maxgrade) AS maxpoints
+FROM {attendance_sessions} ats
+JOIN {attendance} a ON a.id = ats.attendanceid
+JOIN {course} c ON c.id = a.course
+JOIN {attendance_log} atl ON (atl.sessionid = ats.id)
+JOIN {attendance_statuses} stg ON (stg.id = atl.statusid AND stg.deleted = 0 AND stg.visible = 1)
+JOIN (SELECT attendanceid, setnumber, MAX(grade) AS maxgrade
+FROM {attendance_statuses}
+WHERE deleted = 0
+AND visible = 1
+GROUP BY attendanceid, setnumber) stm
+ON (stm.setnumber = ats.statusset AND stm.attendanceid = ats.attendanceid)
                   {$joingroup}
-                  WHERE ats.sessdate >= c.startdate
-                    AND ats.lasttaken != 0
-                    AND stm.maxgrade > 0
+WHERE ats.sessdate >= c.startdate
+AND ats.lasttaken != 0
+AND stm.maxgrade > 0
                     {$where}
-                GROUP BY a.id, a.course, c.fullname, atl.studentid
+GROUP BY a.id, a.course, c.fullname, atl.studentid
                 ) p GROUP by courseid, coursename {$orderby}";
-
     return $DB->get_records_sql($sql, $params);
 }
 
@@ -1119,12 +1053,10 @@ SELECT a.id, a.course as courseid, c.fullname as coursename, atl.studentid AS us
  */
 function attendance_get_users_to_notify($courseids = [], $orderby = '', $allfornotify = false) {
     global $DB, $CFG;
-
     $joingroup = 'LEFT JOIN {groups_members} gm ON (gm.userid = atl.studentid AND gm.groupid = ats.groupid)';
     $where = ' AND (ats.groupid = 0 or gm.id is NOT NULL)';
     $having = '';
     $params = [];
-
     if (!empty($courseids)) {
         [$insql, $inparams] = $DB->get_in_or_equal($courseids, SQL_PARAMS_NAMED);
         $where .= ' AND c.id ' . $insql;
@@ -1137,7 +1069,6 @@ function attendance_get_users_to_notify($courseids = [], $orderby = '', $allforn
     $userfieldsapi = \core_user\fields::for_name();
     $unames = $userfieldsapi->get_sql('', false, '', '', false)->selects . ',';
     $unames2 = $userfieldsapi->get_sql('u', false, '', '', false)->selects . ',';
-
     if (!empty($CFG->showuseridentity)) {
         $extrafields = explode(',', $CFG->showuseridentity);
         foreach ($extrafields as $field) {
@@ -1147,53 +1078,50 @@ function attendance_get_users_to_notify($courseids = [], $orderby = '', $allforn
             }
         }
     }
-
     $idfield = $DB->sql_concat('cm.id', 'atl.studentid', 'n.id');
     $params['yesterday'] = time() - DAYSECS;
     $sql = "SELECT {$idfield} as uniqueid, a.id as aid, {$unames2} a.name as aname, cm.id as cmid, c.id as courseid,
                     c.fullname as coursename, atl.studentid AS userid, n.id as notifyid, n.warningpercent, n.emailsubject,
                     n.emailcontent, n.emailcontentformat, n.emailuser, n.thirdpartyemails, n.warnafter, n.maxwarn,
-                     COUNT(DISTINCT ats.id) AS numtakensessions, SUM(stg.grade) AS points, SUM(stm.maxgrade) AS maxpoints,
-                      COUNT(DISTINCT ns.id) as nscount, MAX(ns.timesent) as timesent,
-                      SUM(stg.grade) / SUM(stm.maxgrade) AS percent
-                   FROM {attendance_sessions} ats
-                   JOIN {attendance} a ON a.id = ats.attendanceid
-                   JOIN {course_modules} cm ON cm.instance = a.id
-                   JOIN {course} c on c.id = cm.course
-                   JOIN {modules} md ON md.id = cm.module AND md.name = 'attendance'
-                   JOIN {attendance_log} atl ON (atl.sessionid = ats.id)
-                   JOIN {user} u ON (u.id = atl.studentid)
-                   JOIN {attendance_statuses} stg ON (stg.id = atl.statusid AND stg.deleted = 0 AND stg.visible = 1)
-                   JOIN {attendance_warning} n ON n.idnumber = a.id
-                   LEFT JOIN {attendance_warning_done} ns ON ns.notifyid = n.id AND ns.userid = atl.studentid
-                   JOIN (SELECT attendanceid, setnumber, MAX(grade) AS maxgrade
-                           FROM {attendance_statuses}
-                          WHERE deleted = 0
-                            AND visible = 1
-                         GROUP BY attendanceid, setnumber) stm
-                     ON (stm.setnumber = ats.statusset AND stm.attendanceid = ats.attendanceid)
+COUNT(DISTINCT ats.id) AS numtakensessions, SUM(stg.grade) AS points, SUM(stm.maxgrade) AS maxpoints,
+COUNT(DISTINCT ns.id) as nscount, MAX(ns.timesent) as timesent,
+SUM(stg.grade) / SUM(stm.maxgrade) AS percent
+FROM {attendance_sessions} ats
+JOIN {attendance} a ON a.id = ats.attendanceid
+JOIN {course_modules} cm ON cm.instance = a.id
+JOIN {course} c on c.id = cm.course
+JOIN {modules} md ON md.id = cm.module AND md.name = 'attendance'
+JOIN {attendance_log} atl ON (atl.sessionid = ats.id)
+JOIN {user} u ON (u.id = atl.studentid)
+JOIN {attendance_statuses} stg ON (stg.id = atl.statusid AND stg.deleted = 0 AND stg.visible = 1)
+JOIN {attendance_warning} n ON n.idnumber = a.id
+LEFT JOIN {attendance_warning_done} ns ON ns.notifyid = n.id AND ns.userid = atl.studentid
+JOIN (SELECT attendanceid, setnumber, MAX(grade) AS maxgrade
+FROM {attendance_statuses}
+WHERE deleted = 0
+AND visible = 1
+GROUP BY attendanceid, setnumber) stm
+ON (stm.setnumber = ats.statusset AND stm.attendanceid = ats.attendanceid)
                   {$joingroup}
-                  WHERE ats.absenteereport = 1 AND ats.attendanceid IN (SELECT distinct attendanceid
-                                                                          FROM {attendance_sessions}
-                                                                         WHERE sessdate > :yesterday)
+WHERE ats.absenteereport = 1 AND ats.attendanceid IN (SELECT distinct attendanceid
+FROM {attendance_sessions}
+WHERE sessdate > :yesterday)
                   {$where}
-                GROUP BY uniqueid, a.id, a.name, a.course, c.fullname, atl.studentid, n.id, n.warningpercent,
+GROUP BY uniqueid, a.id, a.name, a.course, c.fullname, atl.studentid, n.id, n.warningpercent,
                          n.emailsubject, n.emailcontent, n.emailcontentformat, n.warnafter, n.maxwarn,
                          n.emailuser, n.thirdpartyemails, cm.id, c.id, {$unames2} ns.userid
-                HAVING n.warnafter <= COUNT(DISTINCT ats.id) AND n.warningpercent > ((SUM(stg.grade) / SUM(stm.maxgrade)) * 100)
+HAVING n.warnafter <= COUNT(DISTINCT ats.id) AND n.warningpercent > ((SUM(stg.grade) / SUM(stm.maxgrade)) * 100)
                 {$having}
                       {$orderby}";
-
     if (!$allfornotify) {
         $idfield = $DB->sql_concat('cmid', 'userid');
         // Only show one record per attendance for teacher reports.
         $sql = "SELECT DISTINCT {$idfield} as id, {$unames} aid, cmid, courseid, aname, coursename, userid,
                         numtakensessions, percent, MAX(timesent) as timesent
-              FROM ({$sql}) as m
-         GROUP BY id, aid, cmid, courseid, aname, userid, numtakensessions,
-                  percent, {$unames} coursename {$orderby}";
+                FROM ({$sql}) as m
+                GROUP BY id, aid, cmid, courseid, aname, userid, numtakensessions,
+                          percent, {$unames} coursename {$orderby}";
     }
-
     return $DB->get_records_sql($sql, $params);
 }
 
@@ -1226,7 +1154,6 @@ function attendance_template_variables($record) {
     $replacements = array_values($templatevars); // The values which are to be templated in for the placeholders.
     // Array to describe which fields in reengagement object should have a template replacement.
     $replacementfields = ['emailsubject', 'emailcontent'];
-
     // Replace %variable% with relevant value everywhere it occurs in reengagement->field.
     foreach ($replacementfields as $field) {
         $record->$field = preg_replace($patterns, $replacements, $record->$field);
@@ -1280,9 +1207,7 @@ function attendance_session_get_highest_status(mod_attendance_structure $att, $a
  */
 function attendance_get_automarkoptions() {
     global $COURSE;
-
     $options = [];
-
     $options[ATTENDANCE_AUTOMARK_DISABLED] = get_string('noautomark', 'attendance');
     if (strpos(get_config('tool_log', 'enabled_stores'), 'logstore_standard') !== false) {
         $options[ATTENDANCE_AUTOMARK_ALL] = get_string('automarkall', 'attendance');
@@ -1291,7 +1216,6 @@ function attendance_get_automarkoptions() {
     if ($COURSE->id == SITEID || $COURSE->enablecompletion == COMPLETION_ENABLED) {
         $options[ATTENDANCE_AUTOMARK_ACTIVITYCOMPLETION] = get_string('onactivitycompletion', 'attendance');
     }
-
     return $options;
 }
 
@@ -1328,7 +1252,6 @@ function attendance_get_sharedipoptions() {
     $options[ATTENDANCE_SHAREDIP_DISABLED] = get_string('no');
     $options[ATTENDANCE_SHAREDIP_FORCE] = get_string('yes');
     $options[ATTENDANCE_SHAREDIP_MINUTES] = get_string('setperiod', 'attendance');
-
     return $options;
 }
 
@@ -1339,13 +1262,11 @@ function attendance_get_sharedipoptions() {
  */
 function attendance_strftimehm($time) {
     $mins = userdate($time, '%M');
-
     if ($mins == '00') {
         $format = get_string('strftimeh', 'attendance');
     } else {
         $format = get_string('strftimehm', 'attendance');
     }
-
     $userdate = userdate($time, $format);
     if (stripos($format, '%p') && empty($userdate)) {
         // Failover - if %p is in use, but resulting time is empty (windows server), make sure a time is still returned.
@@ -1357,7 +1278,6 @@ function attendance_strftimehm($time) {
         }
         return $userdate;
     }
-
     // Some Lang packs use %p to suffix with AM/PM but not all strftime support this.
     // Check if %p is in use and make sure it's being respected.
     if (stripos($format, '%p')) {
@@ -1378,7 +1298,6 @@ function attendance_strftimehm($time) {
             $userdate = str_replace('pm', 'PM', $userdate);
         }
     }
-
     return $userdate;
 }
 
@@ -1391,7 +1310,6 @@ function attendance_strftimehm($time) {
 function attendance_construct_session_time($datetime, $duration) {
     $starttime = attendance_strftimehm($datetime);
     $endtime = attendance_strftimehm($datetime + $duration);
-
     return $starttime . ($duration > 0 ? ' - ' . $endtime : '');
 }
 
@@ -1405,7 +1323,6 @@ function attendance_construct_session_time($datetime, $duration) {
 function construct_session_full_date_time($datetime, $duration) {
     $sessinfo = userdate($datetime, get_string('strftimedmyw', 'attendance'));
     $sessinfo .= ' ' . attendance_construct_session_time($datetime, $duration);
-
     return $sessinfo;
 }
 
@@ -1416,14 +1333,12 @@ function construct_session_full_date_time($datetime, $duration) {
  */
 function attendance_renderqrcode($session) {
     global $CFG;
-
     if (strlen($session->studentpassword) > 0) {
         $qrcodeurl = $CFG->wwwroot . '/mod/attendance/attendance.php?qrpass=' .
             $session->studentpassword . '&sessid=' . $session->id;
     } else {
         $qrcodeurl = $CFG->wwwroot . '/mod/attendance/attendance.php?sessid=' . $session->id;
     }
-
     $barcode = new TCPDF2DBarcode($qrcodeurl, 'QRCODE');
     $image = $barcode->getBarcodePngData(15, 15);
     echo html_writer::img('data:image/png;base64,' . base64_encode($image), get_string('qrcode', 'attendance'));
@@ -1438,12 +1353,10 @@ function attendance_generate_passwords($session) {
     global $DB;
     $attconfig = get_config('attendance');
     $password = [];
-
     for ($i = 0; $i < 30; $i++) {
         array_push($password, ["attendanceid" => $session->id,
-            "password" => random_string(), "expirytime" => time() + ($attconfig->rotateqrcodeinterval * $i)]);
+                               "password" => random_string(), "expirytime" => time() + ($attconfig->rotateqrcodeinterval * $i)]);
     }
-
     $DB->insert_records('attendance_rotate_passwords', $password);
 }
 
@@ -1472,8 +1385,8 @@ function attendance_renderqrcoderotate($session) {
     );
     echo html_writer::div('', '', ['id' => 'qrcode']); // Div to display qr code.
     echo html_writer::div(get_string('qrcodevalidbefore', 'attendance') . ' ' .
-                          html_writer::span('0', '', ['id' => 'rotate-time']) . ' '
-                          . get_string('qrcodevalidafter', 'attendance'), 'qrcodevalid'); // Div to display timer.
+        html_writer::span('0', '', ['id' => 'rotate-time']) . ' '
+        . get_string('qrcodevalidafter', 'attendance'), 'qrcodevalid'); // Div to display timer.
     // Js to start the password manager.
     echo '
     <script type="text/javascript">
@@ -1490,7 +1403,83 @@ function attendance_renderqrcoderotate($session) {
  */
 function attendance_return_passwords($session) {
     global $DB;
-
     $sql = 'SELECT * FROM {attendance_rotate_passwords} WHERE attendanceid = ? AND expirytime > ? ORDER BY expirytime ASC';
     return json_encode($DB->get_records_sql($sql, ['attendanceid' => $session->id, time()], $strictness = IGNORE_MISSING));
+}
+
+/**
+ * Used to construct user summary.
+ *
+ * @param stdclass $usersummary - data for summary.
+ * @param int $view - ATT_VIEW_ALL|ATT_VIEW_
+ * @return string.
+ */
+function attendance_construct_user_data_stat($usersummary, $view) {
+    $stattable = new html_table();
+    $stattable->attributes['class'] = 'attlist table-reboot';
+    $row = new html_table_row();
+    $row->attributes['class'] = 'normal';
+    $row->cells[] = get_string('sessionscompleted', 'attendance') . ':';
+    $row->cells[] = $usersummary->numtakensessions;
+    $stattable->data[] = $row;
+    $row = new html_table_row();
+    $row->attributes['class'] = 'normal';
+    $row->cells[] = get_string('pointssessionscompleted', 'attendance') . ':';
+    $row->cells[] = $usersummary->pointssessionscompleted;
+    $stattable->data[] = $row;
+    $row = new html_table_row();
+    $row->attributes['class'] = 'normal';
+    $row->cells[] = get_string('percentagesessionscompleted', 'attendance') . ':';
+    $row->cells[] = $usersummary->percentagesessionscompleted;
+    $stattable->data[] = $row;
+
+    // if ($view == ATT_VIEW_ALL) {
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('sessionstotal', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->numallsessions;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('pointsallsessions', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->pointsallsessions;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('percentageallsessions', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->allsessionspercentage;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'normal';
+    //     $row->cells[] = get_string('maxpossiblepoints', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->maxpossiblepoints;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'normal';
+    //     $row->cells[] = get_string('maxpossiblepercentage', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->maxpossiblepercentage;
+    //     $stattable->data[] = $row;
+    // }
+
+    return html_writer::table($stattable);
+}
+
+/**
+ * Returns html user summary
+ *
+ * @param stdclass $attendance - attendance record.
+ * @param stdclass $user - user record
+ * @deprecated since 5.0
+ * @return string.
+ *
+ */
+function construct_full_user_stat_html_table($attendance, $user) {
+    debugging('function construct_full_user_stat_html_table is deprecated, please make sure you are using the ' .
+        'latest Attendance block.', DEBUG_DEVELOPER);
+    $summary = new mod_attendance_summary($attendance->id, $user->id);
+    return attendance_construct_user_data_stat($summary->get_all_sessions_summary_for($user->id), ATT_VIEW_ALL);
 }
