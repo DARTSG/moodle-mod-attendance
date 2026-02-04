@@ -22,6 +22,7 @@
  */
 defined('MOODLE_INTERNAL') || die();
 require_once($CFG->libdir . '/gradelib.php');
+require_once(dirname(__FILE__) . '/renderhelpers.php');
 
 define('ATT_VIEW_DAYS', 1);
 define('ATT_VIEW_WEEKS', 2);
