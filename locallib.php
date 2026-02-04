@@ -1432,33 +1432,39 @@ function attendance_construct_user_data_stat($usersummary, $view) {
     $row->cells[] = get_string('percentagesessionscompleted', 'attendance') . ':';
     $row->cells[] = $usersummary->percentagesessionscompleted;
     $stattable->data[] = $row;
-    if ($view == ATT_VIEW_ALL) {
-        $row = new html_table_row();
-        $row->attributes['class'] = 'highlight';
-        $row->cells[] = get_string('sessionstotal', 'attendance') . ':';
-        $row->cells[] = $usersummary->numallsessions;
-        $stattable->data[] = $row;
-        $row = new html_table_row();
-        $row->attributes['class'] = 'highlight';
-        $row->cells[] = get_string('pointsallsessions', 'attendance') . ':';
-        $row->cells[] = $usersummary->pointsallsessions;
-        $stattable->data[] = $row;
-        $row = new html_table_row();
-        $row->attributes['class'] = 'highlight';
-        $row->cells[] = get_string('percentageallsessions', 'attendance') . ':';
-        $row->cells[] = $usersummary->allsessionspercentage;
-        $stattable->data[] = $row;
-        $row = new html_table_row();
-        $row->attributes['class'] = 'normal';
-        $row->cells[] = get_string('maxpossiblepoints', 'attendance') . ':';
-        $row->cells[] = $usersummary->maxpossiblepoints;
-        $stattable->data[] = $row;
-        $row = new html_table_row();
-        $row->attributes['class'] = 'normal';
-        $row->cells[] = get_string('maxpossiblepercentage', 'attendance') . ':';
-        $row->cells[] = $usersummary->maxpossiblepercentage;
-        $stattable->data[] = $row;
-    }
+
+    // if ($view == ATT_VIEW_ALL) {
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('sessionstotal', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->numallsessions;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('pointsallsessions', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->pointsallsessions;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'highlight';
+    //     $row->cells[] = get_string('percentageallsessions', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->allsessionspercentage;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'normal';
+    //     $row->cells[] = get_string('maxpossiblepoints', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->maxpossiblepoints;
+    //     $stattable->data[] = $row;
+
+    //     $row = new html_table_row();
+    //     $row->attributes['class'] = 'normal';
+    //     $row->cells[] = get_string('maxpossiblepercentage', 'attendance') . ':';
+    //     $row->cells[] = $usersummary->maxpossiblepercentage;
+    //     $stattable->data[] = $row;
+    // }
+
     return html_writer::table($stattable);
 }
 
