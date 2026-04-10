@@ -713,20 +713,31 @@ function attendance_exporttotableed($data, $filename, $format) {
     $workbook->send($filename);
     $worksheet = $workbook->add_worksheet(get_string('modulenameplural', 'attendance'));
 
-    // Bold format (headers only)
+    // Bold format for normal headers
     $boldformat = $workbook->add_format();
     $boldformat->set_bold(1);
 
-    $rowindex = 0;
-    $freezeatrow = null;
+    // Summary bold format (for headers and Total rows)
+    $summarybold = $workbook->add_format();
+    $summarybold->set_bold(1);
 
+    $rowindex = 0;
 
     // Summary rows
     if (!empty($data->summaryrows)) {
         foreach ($data->summaryrows as $row) {
             $colindex = 0;
+            $first_cell = $row[0] ?? '';
+
+            // Bold if it's a SUMMARY header row OR a Total row
+            $should_bold = (strpos($first_cell, 'SUMMARY:') === 0) || (strpos($first_cell, 'Total ') === 0);
+
             foreach ($row as $cell) {
-                $worksheet->write($rowindex, $colindex++, $cell);
+                if ($should_bold) {
+                    $worksheet->write($rowindex, $colindex++, $cell, $summarybold);
+                } else {
+                    $worksheet->write($rowindex, $colindex++, $cell);   // normal text for groups
+                }
             }
             $rowindex++;
         }
@@ -741,16 +752,13 @@ function attendance_exporttotableed($data, $filename, $format) {
     }
     $rowindex++;
 
-    
-    // Student rows + repeated header (conditional bold)
+    // Student rows + repeated header
     foreach ($data->table as $row) {
         $colindex = 0;
-
         $isrepeatheader = isset($row['_repeatheader']);
         if ($isrepeatheader) {
-            unset($row['_repeatheader']); // remove marker before writing
+            unset($row['_repeatheader']);
         }
-
         foreach ($row as $cell) {
             $worksheet->write(
                 $rowindex,
