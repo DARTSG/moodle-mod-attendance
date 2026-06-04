@@ -88,6 +88,7 @@ if ($formdata = $mform->get_data()) {
 
     foreach ($timeslots as $date) {
         $data->tabhead[] = $date;
+        $data->tabhead[] = $date . ' Remarks';
     }
 
     foreach ($reportdata->statuses as $sts) {
@@ -134,26 +135,34 @@ if ($formdata = $mform->get_data()) {
         // === ULTRA ROBUST LOOKUP: check ALL sessions matching the time slot ===
         $clean_cells = [];
         $p_count = 0; $e_count = 0; $a_count = 0; $total_taken = 0;
-
+        
         foreach ($timeslots as $slotkey => $date) {
             $cell = '';
-
-            // Loop through ALL sessions to find one that matches this time slot AND has a log for this student
+            $remarks = '';
+        
             foreach ($reportdata->sessions as $sess) {
                 if (($sess->sessdate . '_' . $sess->duration) === $slotkey) {
+        
                     $log = $DB->get_record('attendance_log', [
                         'studentid' => $user->id,
                         'sessionid' => $sess->id
                     ]);
+        
                     if ($log) {
-                        $status = $DB->get_record('attendance_statuses', ['id' => $log->statusid]);
+                        $status = $DB->get_record('attendance_statuses', [
+                            'id' => $log->statusid
+                        ]);
+        
                         $cell = $status ? $status->acronym : '';
-                        break;   // found a valid log → use it and stop
+                        $remarks = $log->remarks ?? '';
+        
+                        break;
                     }
                 }
             }
-
+        
             $clean_cells[] = $cell;
+            $clean_cells[] = $remarks;
 
             if ($cell === 'P') { $p_count++; $total_taken++; $group_p_counts[$user->primary_group][$slotkey] = ($group_p_counts[$user->primary_group][$slotkey] ?? 0) + 1; }
             if ($cell === 'E') { $e_count++; $total_taken++; $group_e_counts[$user->primary_group][$slotkey] = ($group_e_counts[$user->primary_group][$slotkey] ?? 0) + 1; }
