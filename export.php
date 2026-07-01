@@ -88,7 +88,10 @@ if ($formdata = $mform->get_data()) {
 
     foreach ($timeslots as $date) {
         $data->tabhead[] = $date;
-        $data->tabhead[] = $date . ' Remarks';
+    
+        if (!empty($formdata->remarks)) {
+            $data->tabhead[] = $date . ' Remarks';
+        }
     }
 
     foreach ($reportdata->statuses as $sts) {
@@ -162,7 +165,10 @@ if ($formdata = $mform->get_data()) {
             }
         
             $clean_cells[] = $cell;
-            $clean_cells[] = $remarks;
+
+            if (!empty($formdata->remarks)) {
+                $clean_cells[] = $remarks;
+            }
 
             if ($cell === 'P') { $p_count++; $total_taken++; $group_p_counts[$user->primary_group][$slotkey] = ($group_p_counts[$user->primary_group][$slotkey] ?? 0) + 1; }
             if ($cell === 'E') { $e_count++; $total_taken++; $group_e_counts[$user->primary_group][$slotkey] = ($group_e_counts[$user->primary_group][$slotkey] ?? 0) + 1; }
