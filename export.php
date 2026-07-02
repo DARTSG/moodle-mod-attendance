@@ -89,7 +89,7 @@ if ($formdata = $mform->get_data()) {
     foreach ($timeslots as $date) {
         $data->tabhead[] = $date;
     
-        if (!empty($formdata->remarks)) {
+        if (!empty($formdata->includeremarks)) {
             $data->tabhead[] = $date . ' Remarks';
         }
     }
@@ -166,7 +166,7 @@ if ($formdata = $mform->get_data()) {
         
             $clean_cells[] = $cell;
 
-            if (!empty($formdata->remarks)) {
+            if (!empty($formdata->includeremarks)) {
                 $clean_cells[] = $remarks;
             }
 
