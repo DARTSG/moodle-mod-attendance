@@ -68,7 +68,7 @@ if ($formdata = $mform->get_data()) {
     $filename = clean_filename($course->shortname . '_attendance_' . userdate(time(), '%Y%m%d-%H%M'));
 
     $data = new stdClass();
-    $data->tabhead = [get_string('lastname'), get_string('firstname'), get_string('groups')];
+    $data->tabhead = ['Full Name', get_string('groups')];
 
     require_once($CFG->dirroot . '/user/profile/lib.php');
     if (isset($formdata->ident)) {
@@ -127,7 +127,7 @@ if ($formdata = $mform->get_data()) {
     });
 
     foreach ($users_with_group as $user) {
-        $row = [$user->lastname, $user->firstname, $user->primary_group];
+        $row = [$user->lastname . ' ' . $user->firstname, $user->primary_group];
 
         if (isset($formdata->ident)) {
             foreach (array_keys($formdata->ident) as $opt) {
@@ -203,7 +203,7 @@ if ($formdata = $mform->get_data()) {
     sort($all_groups);
     $data->summaryrows = [];
 
-    $left_padding = 3;
+    $left_padding = 2;
 
     // P Summary
     $p_header = array_fill(0, $full_col_count, '');
